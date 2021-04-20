@@ -222,6 +222,7 @@ Public Class CasparCG
    End Property
 
    Public Property AddInfoFields As enumAddInfoFieldsType = enumAddInfoFieldsType.itStandard
+   Public Property OverwriteInfoFields As Boolean = False
 
    ''' <summary>
    ''' If Caspar is on the local machine
@@ -630,7 +631,7 @@ Public Class CasparCG
 
       If TemplateData IsNot Nothing Then
 
-         If Not TemplateData.InfoFieldsAdded Then
+         If Not TemplateData.InfoFieldsAdded Or OverwriteInfoFields Then
             Select Case Me.AddInfoFields
                Case enumAddInfoFieldsType.itStandard
                   TemplateData.AddField("channel", Channel.ToString)
@@ -669,7 +670,7 @@ Public Class CasparCG
 
       If TemplateData IsNot Nothing Then
 
-         If Not TemplateData.InfoFieldsAdded Then
+         If Not TemplateData.InfoFieldsAdded Or OverwriteInfoFields Then
             Select Case Me.AddInfoFields
                Case enumAddInfoFieldsType.itStandard
                   TemplateData.AddField("channel", Channel.ToString)
@@ -3590,7 +3591,31 @@ Public Class CasparCG
       Return String.Format("{0} Channel {1}", Name, DefaultChannel)
    End Function
 
-   Public Shared Sub WriteCasparConfig(ByVal TemplateXMLFilename As String, ByVal CasparExePath As String, ByVal AssetsPath As String)
+   ''' <summary>
+   ''' Checks if the current threads country uses NTSC framerate 29.97, 30, 59.94 or 60fps
+   ''' </summary>
+   ''' <returns>True/False</returns>
+   Public Shared Function CurrentCountryIsNTSC() As Boolean
+
+      'Contains a list of NTSC country two letter ISO codes
+      Dim iso As String() = {"AN", "BS", "BB", "BM", "BO", "CA", "CL", "CO", "CR", "CU", "CW", "DO", "EC", "SV", "GL", "GU", "GT", "HN", "JM", "JP", "KR", "MX", "NI", "PA", "PE", "PH", "PR", "LK", "SR", "TW", "TT", "US", "VE", "VN", "VI"}
+      Dim isoHash As HashSet(Of String) = New HashSet(Of String)(iso)
+      Dim ci As CultureInfo = Thread.CurrentThread.CurrentCulture
+      Dim ri As RegionInfo = New RegionInfo(ci.LCID)
+
+      Return isoHash.Contains(ri.TwoLetterISORegionName.ToUpper)
+
+   End Function
+
+   ''' <summary>
+   ''' Write a caspar.config file based on a template
+   ''' </summary>
+   ''' <param name="TemplateXMLFilename">Template file to use. {paths} will be replaced by the paths to the assets, {videomode} will be replased with the 1080i and the current framerate.</param>
+   ''' <param name="CasparExePath">Path to the CasparCG exe file</param>
+   ''' <param name="AssetsPath">Base path for all assets. If the folders do not exist, they will be created.</param>
+   ''' <param name="modePAL">Optional, videomode string for PAL countries</param>
+   ''' <param name="modeNTSC">Optional, videomode string for NTSC countries</param>
+   Public Shared Sub WriteCasparConfig(ByVal TemplateXMLFilename As String, ByVal CasparExePath As String, ByVal AssetsPath As String, Optional ByVal modePAL As String = "1080i5000", Optional ByVal modeNTSC As String = "1080i5994")
 
       If Not IO.File.Exists(Path.Combine(CasparExePath, "casparcg.config")) Then
 
@@ -3643,13 +3668,14 @@ Public Class CasparCG
                Using writer As StreamWriter = New StreamWriter(IO.Path.Combine(CasparExePath, "casparcg.config"))
 
                   Dim line As String
+                  Dim head As String
                   Do
                      If reader.EndOfStream Then Exit Do
 
                      line = reader.ReadLine()
                      If line.Trim.ToLower = "{paths}" Then
 
-                        Dim head As String = line.ToLower.Replace("{paths}", "")
+                        head = line.ToLower.Replace("{paths}", "")
 
                         writer.WriteLine(String.Format("{1}<media-path>{0}\media\</media-path>", AssetsPath, head))
                         writer.WriteLine(String.Format("{1}<log-path>{0}\log\</log-path>", AssetsPath, head))
@@ -3657,6 +3683,16 @@ Public Class CasparCG
                         writer.WriteLine(String.Format("{1}<template-path>{0}\templates\</template-path>", AssetsPath, head))
                         writer.WriteLine(String.Format("{1}<thumbnails-path>{0}\thumbnails\</thumbnails-path>", AssetsPath, head))
                         writer.WriteLine(String.Format("{1}<font-path>{0}</font-path>", System.Environment.GetFolderPath(Environment.SpecialFolder.Fonts), head))
+
+                     ElseIf line.Trim.ToLower = "{videomode}" Then
+
+                        head = line.ToLower.Replace("{videomode}", "")
+
+                        If CurrentCountryIsNTSC() Then
+                           writer.WriteLine(String.Format("{1}<video-mode>{0}</video-mode>", modeNTSC, head))
+                        Else
+                           writer.WriteLine(String.Format("{1}<video-mode>{0}</video-mode>", modePAL, head))
+                        End If
 
                      Else
                         writer.WriteLine(line)

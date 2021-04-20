@@ -118,7 +118,7 @@ Public Class Template
             If tf.RenderAsElement = False Then
 
                'render as attribute
-               sb.AppendFormat("<data id={0}{2}{0} value={0}{1}{0}", quote, tf.Value.Replace(ChrW(&H22), "\\&quot;").Replace("'", "\\&apos;"), IIf(tf.AttributeType = TemplateField.enumAttributeType.Text, "text", "image"))
+               sb.AppendFormat("<data id={0}{2}{0} value={0}{1}{0}", quote, tf.Value.Replace("\", "\\\\").Replace(ChrW(&H22), "\\&quot;").Replace("'", "\\&apos;"), IIf(tf.AttributeType = TemplateField.enumAttributeType.Text, "text", "image"))
                For Each kvp As KeyValuePair(Of String, String) In tf.Attachements
                   sb.AppendFormat(" {1}={0}{2}{0}", quote, kvp.Key, kvp.Value.Replace(ChrW(&H22), "'"))
                Next
