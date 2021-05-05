@@ -86,9 +86,10 @@ Public Class Template
    ''' <summary>
    ''' Formats the Fields list as XML
    ''' </summary>
+   ''' <param name="FormatForHTML">True to replace backslashes, single and double quotes for HTML</param>
    ''' <returns>A XML formated string</returns>
    ''' <remarks>Uses the XML format, that the template commands need</remarks>
-   Public Function TemplateDataText() As String
+   Public Function TemplateDataText(FormatForHTML As Boolean) As String
 
       '---XML Format:
       '<templateData>
@@ -118,7 +119,12 @@ Public Class Template
             If tf.RenderAsElement = False Then
 
                'render as attribute
-               sb.AppendFormat("<data id={0}{2}{0} value={0}{1}{0}", quote, tf.Value.Replace("\", "\\\\").Replace(ChrW(&H22), "\\&quot;").Replace("'", "\\&apos;"), IIf(tf.AttributeType = TemplateField.enumAttributeType.Text, "text", "image"))
+               If FormatForHTML Then
+                  sb.AppendFormat("<data id={0}{2}{0} value={0}{1}{0}", quote, tf.Value.Replace("\", "\\\\").Replace(ChrW(&H22), "\\&quot;").Replace("'", "\\&apos;"), IIf(tf.AttributeType = TemplateField.enumAttributeType.Text, "text", "image"))
+               Else
+                  sb.AppendFormat("<data id={0}{2}{0} value={0}{1}{0}", quote, tf.Value.Replace(ChrW(&H22), "'"), IIf(tf.AttributeType = TemplateField.enumAttributeType.Text, "text", "image"))
+               End If
+
                For Each kvp As KeyValuePair(Of String, String) In tf.Attachements
                   sb.AppendFormat(" {1}={0}{2}{0}", quote, kvp.Key, kvp.Value.Replace(ChrW(&H22), "'"))
                Next
@@ -323,7 +329,7 @@ Public Class Template
       If Me.Width > 0 Then
          Return String.Format("{0}, {1}x{2}, {3}", Me.Name, Me.Width, Me.Height, Me.Author)
       Else
-         Return TemplateDataText()
+         Return TemplateDataText(False)
       End If
    End Function
 

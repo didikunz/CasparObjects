@@ -225,6 +225,11 @@ Public Class CasparCG
    Public Property OverwriteInfoFields As Boolean = False
 
    ''' <summary>
+   ''' True to replace backslashes, single and double quotes for HTML.
+   ''' </summary>
+   Public Property FormatTextsForHTML As Boolean = False
+
+   ''' <summary>
    ''' If Caspar is on the local machine
    ''' </summary>
    ''' <returns>True if local, false if remote</returns>
@@ -246,24 +251,10 @@ Public Class CasparCG
    ''' <remarks>The path is a network share seen from the client</remarks>
    Public Property RemotePictureFolder As String
 
-   'Obsolete
-
-   '''' <summary>
-   '''' The name of the field containing the current channel
-   '''' </summary>
-   'Public Property TemplateChannelFieldname As String = "channel"
-
-   '''' <summary>
-   '''' The name of the field containing the current layer
-   '''' </summary>
-   'Public Property TemplateLayerFieldname As String = "layer"
-
    ''' <summary>
    ''' Indicate connection status
    ''' </summary>
    ''' <remarks>True if connected, false otherwise</remarks>
-   ''' 
-
    Public ReadOnly Property Connected As Boolean
       Get
          Return _Caspar.Connected
@@ -440,84 +431,6 @@ Public Class CasparCG
 
 #End Region
 
-#Region "Functions"
-
-   ''' <summary>
-   ''' Check if something is playing on the default layer and channel
-   ''' </summary>
-   ''' <returns></returns>
-   Public Function IsPlaying() As Boolean
-      Return IsPlaying(DefaultChannel, DefaultLayer)
-   End Function
-
-   ''' <summary>
-   ''' Check if something is playing on the given layer on the default channel
-   ''' </summary>
-   ''' <param name="Layer">The layer number</param>
-   ''' <returns></returns>
-   Public Function IsPlaying(ByVal Layer As Integer) As Boolean
-      Return IsPlaying(DefaultChannel, Layer)
-   End Function
-
-   ''' <summary>
-   ''' Check if something is playing on the given layer on the given channel
-   ''' </summary>
-   ''' <param name="Channel">The channel in Caspar</param>
-   ''' <param name="Layer">The layer number</param>
-   ''' <returns></returns>
-   Public Function IsPlaying(ByVal Channel As Integer, ByVal Layer As Integer) As Boolean
-
-      Dim ret As Boolean = False
-
-      Try
-         Dim s As String = Execute(String.Format("INFO {0}-{1}", Channel, Layer)).Data
-         Dim doc As XmlDocument = New XmlDocument()
-         doc.LoadXml(Left(s, InStrRev(s, ">")))
-         Dim ndLayer As XmlNode = doc.ChildNodes(1)
-         For Each nd As XmlNode In ndLayer.ChildNodes
-            If nd.Name = "frame-age" Then
-               ret = (nd.InnerText <> "0")
-               Exit For
-            End If
-         Next
-      Catch ex As Exception
-         ret = True
-      End Try
-
-      Return ret
-
-   End Function
-
-   Public Function GetTemplateParameters(ByVal TemplateName As String) As List(Of TemplateParameter)
-
-      Dim lst As List(Of TemplateParameter) = New List(Of TemplateParameter)
-
-      Try
-
-         Dim s As String = Execute(String.Format("INFO TEMPLATE {0}", TemplateName)).Data
-
-         Dim doc As XmlDocument = New XmlDocument()
-         doc.LoadXml(Left(s, s.IndexOf("</template>") + 11))
-
-         Dim nl As XmlNodeList = doc.SelectNodes("/template/parameters/parameter")
-
-         For Each nd As XmlNode In nl
-            Dim tp As TemplateParameter = New TemplateParameter(nd.Attributes("id").InnerText, nd.Attributes("type").InnerText, nd.Attributes("info").InnerText)
-            lst.Add(tp)
-         Next
-
-      Catch ex As Exception
-         Debug.Print(ex.Message)
-      End Try
-
-      Return lst
-
-   End Function
-
-#End Region
-
-#Region "Methods"
-
 #Region "Template Commands"
 
    ''' <summary>
@@ -646,7 +559,7 @@ Public Class CasparCG
          ''ToDo: Comment out for production
          'Data_Store("CasparData", TemplateData)
 
-         Return Execute(String.Format("CG {1}-{2} ADD {6} {0}{4}{0} {5} {0}{3}{0}", ChrW(&H22), Channel, Layer, TemplateData.TemplateDataText, TemplateName, IIf(AutoPlay, "1", "0"), FlashLayer))
+         Return Execute(String.Format("CG {1}-{2} ADD {6} {0}{4}{0} {5} {0}{3}{0}", ChrW(&H22), Channel, Layer, TemplateData.TemplateDataText(FormatTextsForHTML), TemplateName, IIf(AutoPlay, "1", "0"), FlashLayer))
 
       Else
          Return New ReturnInfo()
@@ -685,7 +598,7 @@ Public Class CasparCG
          ''ToDo: Comment out for production
          'Data_Store("CasparData", TemplateData)
 
-         Return Execute(String.Format("CG {1}-{2} ADD {6} {0}{4}{0} {5} {0}{3}{0}", ChrW(&H22), Channel, Layer, TemplateData.TemplateDataText, TemplateName, IIf(AutoPlay, "1", "0"), FlashLayer), Retard)
+         Return Execute(String.Format("CG {1}-{2} ADD {6} {0}{4}{0} {5} {0}{3}{0}", ChrW(&H22), Channel, Layer, TemplateData.TemplateDataText(FormatTextsForHTML), TemplateName, IIf(AutoPlay, "1", "0"), FlashLayer), Retard)
 
       Else
          Return New ReturnInfo()
@@ -846,7 +759,7 @@ Public Class CasparCG
    ''' <returns>A ReturnInfo object</returns>
    ''' <remarks>The main CG_Play function.</remarks>
    Public Function CG_Update(ByVal Channel As Integer, ByVal Layer As Integer, ByVal TemplateData As Template, ByVal Optional FlashLayer As Integer = 1) As ReturnInfo
-      Return Execute(String.Format("CG {1}-{2} UPDATE {4} {0}{3}{0}", ChrW(&H22), Channel, Layer, TemplateData.TemplateDataText, FlashLayer))
+      Return Execute(String.Format("CG {1}-{2} UPDATE {4} {0}{3}{0}", ChrW(&H22), Channel, Layer, TemplateData.TemplateDataText(FormatTextsForHTML), FlashLayer))
    End Function
 
    ''' <summary>
@@ -860,7 +773,7 @@ Public Class CasparCG
    ''' <returns>A ReturnInfo object</returns>
    ''' <remarks>The main CG_Play function.</remarks>
    Public Function CG_Update(ByVal Channel As Integer, ByVal Layer As Integer, ByVal TemplateData As Template, ByVal Retard As Retard, ByVal Optional FlashLayer As Integer = 1) As ReturnInfo
-      Return Execute(String.Format("CG {1}-{2} UPDATE {4} {0}{3}{0}", ChrW(&H22), Channel, Layer, TemplateData.TemplateDataText, FlashLayer), Retard)
+      Return Execute(String.Format("CG {1}-{2} UPDATE {4} {0}{3}{0}", ChrW(&H22), Channel, Layer, TemplateData.TemplateDataText(FormatTextsForHTML), FlashLayer), Retard)
    End Function
 
 
@@ -1101,32 +1014,8 @@ Public Class CasparCG
    ''' <returns>A ReturnInfo object</returns>
    ''' <remarks>The main Data_Store Function.</remarks>
    Public Function Data_Store(ByVal DataSetName As String, ByVal TemplateData As Template) As ReturnInfo
-      Return Execute(String.Format("DATA STORE {0}{1}{0} {0}{2}{0}", ChrW(&H22), DataSetName, TemplateData.TemplateDataText))
+      Return Execute(String.Format("DATA STORE {0}{1}{0} {0}{2}{0}", ChrW(&H22), DataSetName, TemplateData.TemplateDataText(FormatTextsForHTML)))
    End Function
-
-   '''' <summary>
-   '''' Stores templatedata as a dataset on the server.
-   '''' </summary>
-   '''' <param name="Channel">The channel in Caspar</param>
-   '''' <param name="Layer">The layer number</param>
-   '''' <param name="DataSetName">The name of the dataset</param>
-   '''' <param name="TemplateData">The Template object to get fields from</param>
-   '''' <returns>A ReturnInfo object</returns>
-   '''' <remarks>A sub Data_Store Function. Adds a channel and a layer TemplateField to the Fields collection. This is usefull to call back the server via TCP/IP.</remarks>
-   'Public Function Data_Store(ByVal Channel As Integer, ByVal Layer As Integer, ByVal DataSetName As String, ByVal TemplateData As Template) As ReturnInfo
-
-   '   'If Me.AddAvecoFields Then
-   '   '   TemplateData.AddField("astra_output", Channel.ToString)
-   '   '   TemplateData.AddField("astra_layer", Layer.ToString)
-   '   'Else
-   '   '   TemplateData.AddField("channel", Channel.ToString)
-   '   '   TemplateData.AddField("layer", Layer.ToString)
-   '   'End If
-
-   '   Return Data_Store(DataSetName, TemplateData)
-
-   'End Function
-
 
    'Public Function Data_Retrieve(DataSetName As String) As Template
    '   Dim ri As ReturnInfo = Execute(String.Format("DATA RETRIEVE {0}{1}{0}", ChrW(&H22), DataSetName), True)
@@ -2239,340 +2128,453 @@ Public Class CasparCG
 
 #End Region
 
-#Region "Other Methods, functions and shared"
+#Region "Grab Commands"
 
-   Private Function AssembleReturnInfo(ByVal s As String) As ReturnInfo
+   Private _grabChannel As Integer
+   Private _grabLayer As Integer
+   Private _grabPicPath As String
+   Private _grabImgNum As Integer = 1
+   Private _grabRi As ReturnInfo
+   Private _grabUniqueId As String
+   Private _returnBitmap As Boolean = False
 
-      Dim ri As ReturnInfo = New ReturnInfo()
+   Private WithEvents _grabTimer As System.Windows.Forms.Timer = New System.Windows.Forms.Timer
+   Private _grabTimerMode As Integer = 0
 
-      If IsNumeric(Left(s, 3)) Then
-         ri.Number = Integer.Parse(Left(s, 3))
-         Dim c As Integer = s.IndexOf(Microsoft.VisualBasic.vbCrLf)
-         If c > 2 Then
-            ri.Message = s.Substring(4, c - 2).Trim
-            Dim d As Integer = s.IndexOf(Microsoft.VisualBasic.vbCrLf, c + 1)
-            If d > 0 Then
-               ri.Data = s.Substring(c + 2).Trim
-               'ri.Data = s.Substring(c + 2, d - c - 2).Trim
-            End If
-         Else
-            ri.Message = "No usefull information returned"
-         End If
-         Return ri
-      Else
-         ri.Number = 0
-         ri.Message = "Data returned"
-         ri.Data = s
+   Public Class GrabFinishEventArgs
+      Inherits EventArgs
+
+      Public Property Image As Drawing.Bitmap
+
+      Public Property UniqueId As String
+
+      Public Property GrabFilename As String
+
+      Public Sub New(ByVal Image As Drawing.Bitmap, ByVal UniqueId As String)
+         MyBase.New()
+         Me.Image = Image
+         Me.UniqueId = UniqueId
+         Me.GrabFilename = ""
+      End Sub
+
+      Public Sub New(ByVal Image As Drawing.Bitmap, ByVal UniqueId As String, ByVal GrabFilename As String)
+         MyBase.New()
+         Me.Image = Image
+         Me.UniqueId = UniqueId
+         Me.GrabFilename = GrabFilename
+      End Sub
+
+   End Class
+
+   Public Delegate Sub GrabFinishEventHandler(ByVal sender As Object, ByVal e As GrabFinishEventArgs)
+
+   Public Event GrabFinish As GrabFinishEventHandler
+
+   Public Sub StartGrab(ByVal channel As Integer, ByVal uniqueId As String)
+      StartGrab(channel, -1, uniqueId, 4000, True)
+   End Sub
+
+   Public Sub StartGrab(ByVal channel As Integer, ByVal layer As Integer, ByVal uniqueId As String)
+      StartGrab(channel, layer, uniqueId, 4000, True)
+   End Sub
+
+   Public Sub StartGrab(ByVal channel As Integer, ByVal uniqueId As String, ByVal initalDelay As Integer)
+      StartGrab(channel, -1, uniqueId, initalDelay, True)
+   End Sub
+
+   Public Sub StartGrab(ByVal channel As Integer, ByVal uniqueId As String, ByVal initalDelay As Integer, returnBitmap As Boolean)
+      StartGrab(channel, -1, uniqueId, initalDelay, returnBitmap)
+   End Sub
+
+   Public Sub StartGrab(ByVal channel As Integer, ByVal layer As Integer, ByVal uniqueId As String, ByVal initalDelay As Integer)
+      StartGrab(channel, layer, uniqueId, initalDelay, True)
+   End Sub
+   Public Sub StartGrab(ByVal channel As Integer, ByVal layer As Integer, ByVal uniqueId As String, ByVal initalDelay As Integer, returnBitmap As Boolean)
+
+      If Me.ServerAdress.Trim.ToLower <> "localhost" And Me.ServerAdress.Trim <> "127.0.0.1" Then
+         Throw New Exception("The Grab-Function only works for local CasparCG-Server (localhost)")
+         Exit Sub
       End If
 
-      Return ri
-   End Function
+      _grabChannel = channel
+      _grabLayer = layer
+      _grabUniqueId = uniqueId
+      _returnBitmap = returnBitmap
 
-   ''' <summary>
-   ''' Sends a command to Caspar for execution
-   ''' </summary>
-   ''' <param name="Command">The command-string</param>
-   ''' <returns>A ReturnInfo object</returns>
-   Public Function Execute(ByVal Command As String) As ReturnInfo
-      Return Execute(Command, New Retard, False)
-   End Function
+      _grabPicPath = ServerPaths.MediaPath
 
-   ''' <summary>
-   ''' Sends a command to Caspar for execution
-   ''' </summary>
-   ''' <param name="Command">The command-string</param>
-   ''' <param name="useDelay">Use a delay while waiting for a server response (list commands)</param>
-   ''' <returns>A ReturnInfo object</returns>
-   Public Function Execute(ByVal Command As String, ByVal useDelay As Boolean) As ReturnInfo
-      Return Execute(Command, New Retard, useDelay)
-   End Function
-
-   ''' <summary>
-   ''' Sends a command to Caspar for execution
-   ''' </summary>
-   ''' <param name="Command">The command-string</param>
-   ''' <param name="Retard">Delay the execution for this amount of milliseconds</param>
-   ''' <returns>A ReturnInfo object</returns>
-   Public Function Execute(ByVal Command As String, ByVal Retard As Retard) As ReturnInfo
-      Return Execute(Command, Retard, False)
-   End Function
-
-   ''' <summary>
-   ''' Sends a command to Caspar for execution
-   ''' </summary>
-   ''' <param name="Command">The command-string</param>
-   ''' <param name="Retard">Delay the execution for this amount of milliseconds</param>
-   ''' <param name="useDelay">Use a delay while waiting for a server response (list commands)</param>
-   ''' <returns>A ReturnInfo object</returns>
-   ''' <remarks>Can be used for any command. See CasparCG's wiki for valid commands</remarks>
-   Public Function Execute(ByVal Command As String, ByVal Retard As Retard, ByVal useDelay As Boolean) As ReturnInfo
-
-      If _Caspar.Connected Then
-
-         'Debug.Print(Command)
-
-         If Retard.Amount > 0 Then
-            _DelayQueue.Add(Retard.Amount, Command)
-         Else
-
-            Dim cmd As Byte() = Encoding.UTF8.GetBytes(Command + Microsoft.VisualBasic.vbCrLf)
-            Dim bytes(128) As Byte
-            Dim s As String = ""
-            Try
-               ' Blocks until send returns.
-               Dim i As Integer = _Caspar.Send(cmd)
-
-               If useDelay Then
-                  Thread.Sleep(250)
-               End If
-
-               ' Get reply from the server.
-               Do
-                  i = _Caspar.Receive(bytes, bytes.Length, SocketFlags.None)
-                  s += Encoding.UTF8.GetString(bytes)
-                  If i < bytes.Length Then Exit Do
-                  'If s.Length > 64000 Then Exit Do 'ToDo: Fix this
-               Loop
-
-            Catch ex As SocketException
-               If s.Length > 0 Then
-                  Return AssembleReturnInfo(s)
-               Else
-                  Return New ReturnInfo(0, String.Format("{0} Error code: {1}.", ex.Message, ex.ErrorCode), "")
-               End If
-            End Try
-
-            Return AssembleReturnInfo(s)
-
-         End If
-
-      Else
-
-         _Caspar = New Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp)
-         Connect()
-         If _Caspar.Connected Then
-            Return Execute(Command)
-         Else
-            Return New ReturnInfo(0, "Not connected to CasparCG", "")
-         End If
-
+      If _grabPicPath.EndsWith("\") Then
+         _grabPicPath = _grabPicPath.Substring(0, _grabPicPath.Length - 1)
       End If
 
-      Return New ReturnInfo(0, "Still not connected to CasparCG", "")
-
-   End Function
-
-   ''' <summary>
-   ''' Connects to CasparCG
-   ''' </summary>
-   ''' <param name="serverAdress">IP-Address or computer name to connect to Caspar</param>
-   ''' <remarks>Sets the ServerAdress property</remarks>
-   ''' <returns>A enumConnectResult denoting the result</returns>
-   Public Function Connect(ByVal serverAdress As String) As enumConnectResult
-      _ServerAdress = serverAdress
-      Return Me.Connect()
-   End Function
-
-   ''' <summary>
-   ''' Connects to CasparCG
-   ''' </summary>
-   ''' <param name="serverAdress">IP-Address or computer name to connect to Caspar</param>
-   ''' <param name="Port">The port number to connect to</param>
-   ''' <remarks>Sets the ServerAdress and Port properties</remarks>
-   ''' <returns>A enumConnectResult denoting the result</returns>
-   Public Function Connect(ByVal serverAdress As String, ByVal Port As Integer) As enumConnectResult
-      _ServerAdress = serverAdress
-      _Port = Port
-      Return Me.Connect()
-   End Function
-
-   ''' <summary>
-   ''' Connects to CasparCG
-   ''' </summary>
-   ''' <param name="ServerAdress">IP-Address or computer name to connect to Caspar</param>
-   ''' <param name="KeepQuiet">Inhibits exeptions on connection errors</param>
-   ''' <remarks>Sets the ServerAdress and KeepQuiet properties</remarks>
-   ''' <returns>A enumConnectResult denoting the result</returns>
-   Public Function Connect(ByVal ServerAdress As String, ByVal KeepQuiet As Boolean) As enumConnectResult
-      _ServerAdress = ServerAdress
-      _KeepQuiet = KeepQuiet
-      Return Me.Connect()
-   End Function
-
-   ''' <summary>
-   ''' Connects to CasparCG
-   ''' </summary>
-   ''' <param name="Retries">Number of retries for a connection, before giving up.</param>
-   ''' <param name="CasparExePath">Full qualified path to Caspar's exe file. Must be local to the client.</param>
-   ''' <remarks>Sets the Retries and CasparExePath properties</remarks>
-   ''' <returns>A enumConnectResult denoting the result</returns>
-   Public Function Connect(ByVal Retries As Integer, ByVal CasparExePath As String) As enumConnectResult
-      If Me.ServerAdress.ToLower = "localhost" Or Me.ServerAdress = "127.0.0.1" Then
-         _CasparExePath = CasparExePath
-         _Retries = Retries
-         Return Me.Connect()
-      Else
-         Return enumConnectResult.crIsNotLocal
+      If Not _grabPicPath.Substring(1, 1) = ":" Then
+         Throw New Exception("The Grab-Function needs to have absolute paths configured in CasparCG.config.")
+         Exit Sub
       End If
-   End Function
 
-   ''' <summary>
-   ''' Connects to CasparCG
-   ''' </summary>
-   ''' <remarks>The main Connect function. Uses properties</remarks>
-   ''' <returns>A enumConnectResult denoting the result</returns>
-   Public Function Connect() As enumConnectResult
+      'Delete old files once a day
+      Dim delFn As String = String.Format("~{0:yyyyMMdd}.del", Date.Now)
+      If Not IO.File.Exists(IO.Path.Combine(_grabPicPath, delFn)) Then
 
-      Dim retVal As enumConnectResult = enumConnectResult.crSuccessfull
-
-      Dim ping As Ping = New Ping
-
-      Dim pr As PingReply = ping.Send(_ServerAdress, 1500)
-      If pr.Status = IPStatus.Success Then
+         Dim fn() As String = IO.Directory.GetFiles(_grabPicPath, "~*.del")
 
          Try
-            _Caspar.Connect(_ServerAdress, _Port)
-
+            For c As Integer = 0 To fn.Length - 1
+               IO.File.Delete(IO.Path.Combine(_grabPicPath, fn(c)))
+            Next
          Catch ex As Exception
+            Debug.Print(ex.Message)
+         End Try
 
-            If _Retries > 5 And IO.File.Exists(_CasparExePath) Then
+         fn = IO.Directory.GetFiles(_grabPicPath, "~GRAB_*.png")
+         For c As Integer = 0 To fn.Length - 1
 
-               _CasparProc = New Process
-               _CasparProc.StartInfo.FileName = _CasparExePath
-               _CasparProc.StartInfo.WorkingDirectory = IO.Path.GetDirectoryName(_CasparExePath)
-               _CasparProc.StartInfo.CreateNoWindow = False
-               _CasparProc.StartInfo.WindowStyle = ProcessWindowStyle.Minimized
-               _CasparProc.Start()
+            Try
+               IO.File.Delete(IO.Path.Combine(_grabPicPath, fn(c)))
+            Catch ex As Exception
+               Debug.Print(ex.Message)
+            End Try
+         Next
 
-               Dim t As Integer = 0
-               Do
-                  If Not _Caspar.Connected Then
+         Dim fs As FileStream = File.Create(IO.Path.Combine(_grabPicPath, delFn))
+         fs.Close()
 
-                     Try
-                        _Caspar.Connect(_ServerAdress, _Port)
-                     Catch exp As Exception
-                        Debug.Print(exp.Message)
-                     End Try
+      End If
 
-                  End If
+      _grabTimerMode = 1
+      _grabTimer.Interval = initalDelay
+      _grabTimer.Start()
 
-                  If _Caspar.Connected Then
+   End Sub
 
-                     'Check for Scanner.exe
-                     Dim scannerFilename As String = IO.Path.Combine(IO.Path.GetDirectoryName(_CasparExePath), "Scanner.exe")
-                     If IO.File.Exists(scannerFilename) Then
+   Private Sub _grabTimer_Tick(ByVal sender As Object, ByVal e As EventArgs) Handles _grabTimer.Tick
 
-                        _Scanner = New Process
-                        _Scanner.StartInfo.FileName = IO.Path.Combine(IO.Path.GetDirectoryName(_CasparExePath), "Scanner.exe")
-                        _Scanner.StartInfo.WorkingDirectory = IO.Path.GetDirectoryName(_CasparExePath)
-                        _Scanner.StartInfo.CreateNoWindow = False
-                        _Scanner.StartInfo.WindowStyle = ProcessWindowStyle.Minimized
-                        _Scanner.Start()
+      _grabTimer.Stop()
 
-                     End If
+      Select Case _grabTimerMode
+         Case 1
+            Do
+               If Not IO.File.Exists(IO.Path.Combine(_grabPicPath, String.Format("~GRAB_{0:00000}.png", _grabImgNum))) Then Exit Do
+               _grabImgNum += 1
+            Loop
 
-                     Exit Do
+            If _grabLayer = -1 Then
+               _grabRi = Execute(String.Format("ADD {0} IMAGE ~GRAB_{1:00000}", _grabChannel, _grabImgNum))
+            Else
+               _grabRi = Execute(String.Format("ADD {0}-{1} IMAGE ~GRAB_{2:00000}", _grabChannel, _grabLayer, _grabImgNum))
+            End If
 
-                  Else
+            _grabTimerMode = 2
+            _grabTimer.Interval = 1000
+            _grabTimer.Start()
 
-                     If t > _Retries Then
-                        retVal = enumConnectResult.crLocalCasparCGCouldNotBeStarted
-                        Exit Do
-                     Else
-                        System.Threading.Thread.Sleep(1000)
-                        t += 1
-                     End If
+         Case 2
+            If _grabRi.Number = 202 Then
 
-                  End If
+               If _grabLayer = -1 Then
+                  Execute(String.Format("REMOVE {0} IMAGE", _grabChannel))
+               Else
+                  Execute(String.Format("REMOVE {0}-{1} IMAGE", _grabChannel, _grabLayer))
+               End If
 
-               Loop
+               _grabTimerMode = 3
+               _grabTimer.Interval = 1000
+               _grabTimer.Start()
 
             Else
-               retVal = enumConnectResult.crCasparCGNotStarted
+               RaiseEvent GrabFinish(Me, New GrabFinishEventArgs(Nothing, _grabUniqueId))
             End If
 
-         End Try
+         Case 3
+            Dim fn As String = IO.Path.Combine(_grabPicPath, String.Format("~GRAB_{0:00000}.png", _grabImgNum))
+            If IO.File.Exists(fn) Then
+               _grabTimerMode = 4
+               _grabTimer.Interval = 1500
+               _grabTimer.Start()
+            Else
+               _grabTimerMode = 3
+               _grabTimer.Interval = 500
+               _grabTimer.Start()
+            End If
 
-      Else
-         retVal = enumConnectResult.crMachineNotAvailable
+         Case 4
+            Dim fn As String = String.Format("~GRAB_{0:00000}.png", _grabImgNum)
+
+            Try
+               If _returnBitmap Then
+                  Dim bm As Drawing.Bitmap = New Drawing.Bitmap(IO.Path.Combine(_grabPicPath, fn))
+                  RaiseEvent GrabFinish(Me, New GrabFinishEventArgs(bm, _grabUniqueId, fn))
+               Else
+                  RaiseEvent GrabFinish(Me, New GrabFinishEventArgs(Nothing, _grabUniqueId, fn))
+               End If
+            Catch ex As Exception
+               'Ignore
+            End Try
+
+            _grabTimerMode = 1
+
+         Case Else
+            _grabTimerMode = 1
+
+      End Select
+
+   End Sub
+
+
+
+   ''' <summary>
+   ''' Grab the output to a bitmap
+   ''' </summary>
+   ''' <param name="channel">The channel in Caspar</param>
+   ''' <returns>A Drawing.Bitmap object</returns>
+   ''' <remarks>Defaults to channel 1</remarks>
+   Public Function Grab(ByVal channel As Integer) As Drawing.Bitmap
+      Return Grab(channel, -1)
+   End Function
+
+
+   ''' <summary>
+   ''' Grab the output to a bitmap
+   ''' </summary>
+   ''' <param name="channel">The channel in Caspar</param>
+   ''' <param name="layer">The layer number</param>
+   ''' <returns>A Drawing.Bitmap object</returns>
+   Public Function Grab(ByVal channel As Integer, ByVal layer As Integer) As Drawing.Bitmap
+
+      If Me.ServerAdress.ToLower <> "localhost" Then
+         Throw New Exception("The Grab-Function only works for local CasparCG-Server (localhost)")
+         Return Nothing
+         Exit Function
       End If
 
-      Return retVal
+      If VersionSerialized >= 2000004 Then   'Server 2.0.4 Stable: Breaking change of PRINT command, use ADD IMAGE instead.
+
+         Dim PicPath As String = ServerPaths.MediaPath
+
+         If PicPath.EndsWith("\") Then
+            PicPath = PicPath.Substring(0, PicPath.Length - 1)
+         End If
+
+         If Not PicPath.Substring(1, 1) = ":" Then
+            Throw New Exception("The Grab-Function needs to have absolute paths configured in CasparCG.config.")
+            Return Nothing
+            Exit Function
+         End If
+
+         'Delete old files once a day
+         Dim delFn As String = String.Format("~{0:yyyyMMdd}.del", Date.Now)
+         If Not IO.File.Exists(IO.Path.Combine(PicPath, delFn)) Then
+
+            Dim fn() As String = IO.Directory.GetFiles(PicPath, "~*.del")
+            For c As Integer = 0 To fn.Length - 1
+
+               Try
+                  IO.File.Delete(IO.Path.Combine(PicPath, fn(c)))
+               Catch ex As Exception
+                  Debug.Print(ex.Message)
+               End Try
+
+            Next
+
+            fn = IO.Directory.GetFiles(PicPath, "~GRAB_*.png")
+            For c As Integer = 0 To fn.Length - 1
+
+               Try
+                  IO.File.Delete(IO.Path.Combine(PicPath, fn(c)))
+               Catch ex As Exception
+                  Debug.Print(ex.Message)
+               End Try
+
+            Next
+
+            Dim fs As FileStream = File.Create(IO.Path.Combine(_grabPicPath, delFn))
+            fs.Close()
+
+         End If
+
+         Threading.Thread.Sleep(2000)
+
+         Dim imgNum As Integer = 1
+         Do
+            If Not IO.File.Exists(IO.Path.Combine(PicPath, String.Format("~GRAB_{0:00000}.png", imgNum))) Then Exit Do
+            imgNum += 1
+         Loop
+
+         Dim ri As ReturnInfo
+         If layer = -1 Then
+            ri = Execute(String.Format("ADD {0} IMAGE ~GRAB_{1:00000}", channel, imgNum))
+         Else
+            ri = Execute(String.Format("ADD {0}-{1} IMAGE ~GRAB_{2:00000}", channel, layer, imgNum))
+         End If
+
+         Threading.Thread.Sleep(1000)
+
+         If ri.Number = 202 Then
+
+            If layer = -1 Then
+               Execute(String.Format("REMOVE {0} IMAGE", channel))
+            Else
+               Execute(String.Format("REMOVE {0}-{1} IMAGE", channel, layer))
+            End If
+
+            Dim fn As String = IO.Path.Combine(PicPath, String.Format("~GRAB_{0:00000}.png", imgNum))
+            Do
+               Threading.Thread.Sleep(1000)
+               If IO.File.Exists(fn) Then
+                  Exit Do
+               End If
+            Loop
+
+            Dim bm As Drawing.Bitmap = New Drawing.Bitmap(fn)
+
+            Return bm
+
+         Else
+            Return Nothing
+         End If
+
+
+      Else
+
+         Dim PicPath As String = ServerPaths.DataPath
+
+         If PicPath.EndsWith("\") Then
+            PicPath = PicPath.Substring(0, PicPath.Length - 1)
+         End If
+
+         If Not PicPath.Substring(2, 1) = ":" Then
+            Throw New Exception("The Grab-Function needs to have absolute paths configured in CasparCG.config.")
+            Return Nothing
+            Exit Function
+         End If
+
+         Dim fn() As String
+         fn = IO.Directory.GetFiles(PicPath, "*.png")
+         For c As Integer = 0 To fn.Length - 1
+            IO.File.Delete(fn(c))
+         Next
+
+         Threading.Thread.Sleep(1000)
+
+         Dim ri As ReturnInfo
+         If layer = -1 Then
+            ri = Execute(String.Format("PRINT {0}", channel))
+         Else
+            ri = Execute(String.Format("PRINT {0}-{1}", channel, layer))
+         End If
+
+         If ri.Number = 202 Then
+
+            Do
+               Threading.Thread.Sleep(1000)
+               fn = IO.Directory.GetFiles(PicPath, "*.png")
+               If fn.Length > 0 Then
+                  Exit Do
+               End If
+            Loop
+
+            Dim bm As Drawing.Bitmap = New Drawing.Bitmap(fn(0))
+
+            Return bm
+
+         Else
+            Return Nothing
+         End If
+      End If
 
    End Function
 
    ''' <summary>
-   ''' Disconnects from Caspar
+   ''' Simple Grab function also for remote servers
    ''' </summary>
-   ''' <remarks>The object can reconnect on version 2.0.7</remarks>
-   Public Sub Disconnect()
-      If _Caspar.Connected Then
-         Try
-            _Caspar.Disconnect(False)
-            _Caspar = New Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp)
-         Catch ex As Exception
-            'ignore
-         End Try
-      End If
-   End Sub
+   ''' <param name="Filename">The filename to store the grabbed image</param>
+   ''' <param name="channel">The channel in Caspar</param>
+   ''' <param name="layer">The layer number</param>
+   Public Sub SimpleGrab(ByVal Filename As String, ByVal channel As Integer, ByVal layer As Integer)
 
-   Public Sub Shutdown()
+      Execute(String.Format("ADD {0}-{1} IMAGE {2}", channel, layer, Filename))
 
-      If _Scanner IsNot Nothing Then
-         Try
-            _Scanner.Kill()
-         Catch ex As Exception
-         Finally
-            _Scanner.Dispose()
-         End Try
-      End If
+      Thread.Sleep(1000)
 
-      If _CasparProc IsNot Nothing Then
-         Try
-            _CasparProc.Kill()
-         Catch ex As Exception
-         Finally
-            _CasparProc.Dispose()
-         End Try
-      Else
-         If Version.Major = 2 And Version.Minor = 0 Then
-            Execute("KILL")
-         End If
-      End If
+      Execute(String.Format("REMOVE {0}-{1} IMAGE", channel, layer))
 
    End Sub
 
-   Public Sub Restart()
-      If IO.File.Exists(CasparExePath) Then
+#End Region
 
-         If _Scanner IsNot Nothing Then
-            Try
-               _Scanner.Kill()
-            Catch ex As Exception
-            Finally
-               _Scanner.Dispose()
-            End Try
-         End If
+#Region "Info and query commands"
 
-         If _CasparProc IsNot Nothing Then
-            Try
-               _CasparProc.Kill()
-            Catch ex As Exception
-            Finally
-               _CasparProc.Dispose()
-            End Try
-         Else
-            If Version.Major = 2 And Version.Minor = 0 Then
-               Execute("KILL")
+   ''' <summary>
+   ''' Check if something is playing on the default layer and channel
+   ''' </summary>
+   ''' <returns></returns>
+   Public Function IsPlaying() As Boolean
+      Return IsPlaying(DefaultChannel, DefaultLayer)
+   End Function
+
+   ''' <summary>
+   ''' Check if something is playing on the given layer on the default channel
+   ''' </summary>
+   ''' <param name="Layer">The layer number</param>
+   ''' <returns></returns>
+   Public Function IsPlaying(ByVal Layer As Integer) As Boolean
+      Return IsPlaying(DefaultChannel, Layer)
+   End Function
+
+   ''' <summary>
+   ''' Check if something is playing on the given layer on the given channel
+   ''' </summary>
+   ''' <param name="Channel">The channel in Caspar</param>
+   ''' <param name="Layer">The layer number</param>
+   ''' <returns></returns>
+   Public Function IsPlaying(ByVal Channel As Integer, ByVal Layer As Integer) As Boolean
+
+      Dim ret As Boolean = False
+
+      Try
+         Dim s As String = Execute(String.Format("INFO {0}-{1}", Channel, Layer)).Data
+         Dim doc As XmlDocument = New XmlDocument()
+         doc.LoadXml(Left(s, InStrRev(s, ">")))
+         Dim ndLayer As XmlNode = doc.ChildNodes(1)
+         For Each nd As XmlNode In ndLayer.ChildNodes
+            If nd.Name = "frame-age" Then
+               ret = (nd.InnerText <> "0")
+               Exit For
             End If
-         End If
+         Next
+      Catch ex As Exception
+         ret = True
+      End Try
 
-         _Caspar = New Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp)
-         Threading.Thread.Sleep(2000)
-         Connect()
+      Return ret
 
-      End If
-   End Sub
+   End Function
+
+   Public Function GetTemplateParameters(ByVal TemplateName As String) As List(Of TemplateParameter)
+
+      Dim lst As List(Of TemplateParameter) = New List(Of TemplateParameter)
+
+      Try
+
+         Dim s As String = Execute(String.Format("INFO TEMPLATE {0}", TemplateName)).Data
+
+         Dim doc As XmlDocument = New XmlDocument()
+         doc.LoadXml(Left(s, s.IndexOf("</template>") + 11))
+
+         Dim nl As XmlNodeList = doc.SelectNodes("/template/parameters/parameter")
+
+         For Each nd As XmlNode In nl
+            Dim tp As TemplateParameter = New TemplateParameter(nd.Attributes("id").InnerText, nd.Attributes("type").InnerText, nd.Attributes("info").InnerText)
+            lst.Add(tp)
+         Next
+
+      Catch ex As Exception
+         Debug.Print(ex.Message)
+      End Try
+
+      Return lst
+
+   End Function
 
 
    ''' <summary>
@@ -3083,364 +3085,6 @@ Public Class CasparCG
 
    End Function
 
-#Region "Grab Commands"
-
-   Private _grabChannel As Integer
-   Private _grabLayer As Integer
-   Private _grabPicPath As String
-   Private _grabImgNum As Integer = 1
-   Private _grabRi As ReturnInfo
-   Private _grabUniqueId As String
-   Private _returnBitmap As Boolean = False
-
-   Private WithEvents _grabTimer As System.Windows.Forms.Timer = New System.Windows.Forms.Timer
-   Private _grabTimerMode As Integer = 0
-
-   Public Class GrabFinishEventArgs
-      Inherits EventArgs
-
-      Public Property Image As Drawing.Bitmap
-
-      Public Property UniqueId As String
-
-      Public Property GrabFilename As String
-
-      Public Sub New(ByVal Image As Drawing.Bitmap, ByVal UniqueId As String)
-         MyBase.New()
-         Me.Image = Image
-         Me.UniqueId = UniqueId
-         Me.GrabFilename = ""
-      End Sub
-
-      Public Sub New(ByVal Image As Drawing.Bitmap, ByVal UniqueId As String, ByVal GrabFilename As String)
-         MyBase.New()
-         Me.Image = Image
-         Me.UniqueId = UniqueId
-         Me.GrabFilename = GrabFilename
-      End Sub
-
-   End Class
-
-   Public Delegate Sub GrabFinishEventHandler(ByVal sender As Object, ByVal e As GrabFinishEventArgs)
-
-   Public Event GrabFinish As GrabFinishEventHandler
-
-   Public Sub StartGrab(ByVal channel As Integer, ByVal uniqueId As String)
-      StartGrab(channel, -1, uniqueId, 4000, True)
-   End Sub
-
-   Public Sub StartGrab(ByVal channel As Integer, ByVal layer As Integer, ByVal uniqueId As String)
-      StartGrab(channel, layer, uniqueId, 4000, True)
-   End Sub
-
-   Public Sub StartGrab(ByVal channel As Integer, ByVal uniqueId As String, ByVal initalDelay As Integer)
-      StartGrab(channel, -1, uniqueId, initalDelay, True)
-   End Sub
-
-   Public Sub StartGrab(ByVal channel As Integer, ByVal uniqueId As String, ByVal initalDelay As Integer, returnBitmap As Boolean)
-      StartGrab(channel, -1, uniqueId, initalDelay, returnBitmap)
-   End Sub
-
-   Public Sub StartGrab(ByVal channel As Integer, ByVal layer As Integer, ByVal uniqueId As String, ByVal initalDelay As Integer)
-      StartGrab(channel, layer, uniqueId, initalDelay, True)
-   End Sub
-   Public Sub StartGrab(ByVal channel As Integer, ByVal layer As Integer, ByVal uniqueId As String, ByVal initalDelay As Integer, returnBitmap As Boolean)
-
-      If Me.ServerAdress.Trim.ToLower <> "localhost" And Me.ServerAdress.Trim <> "127.0.0.1" Then
-         Throw New Exception("The Grab-Function only works for local CasparCG-Server (localhost)")
-         Exit Sub
-      End If
-
-      _grabChannel = channel
-      _grabLayer = layer
-      _grabUniqueId = uniqueId
-      _returnBitmap = returnBitmap
-
-      _grabPicPath = ServerPaths.MediaPath
-
-      If _grabPicPath.EndsWith("\") Then
-         _grabPicPath = _grabPicPath.Substring(0, _grabPicPath.Length - 1)
-      End If
-
-      If Not _grabPicPath.Substring(1, 1) = ":" Then
-         Throw New Exception("The Grab-Function needs to have absolute paths configured in CasparCG.config.")
-         Exit Sub
-      End If
-
-      'Delete old files once a day
-      Dim delFn As String = String.Format("~{0:yyyyMMdd}.del", Date.Now)
-      If Not IO.File.Exists(IO.Path.Combine(_grabPicPath, delFn)) Then
-
-         Dim fn() As String = IO.Directory.GetFiles(_grabPicPath, "~*.del")
-         For c As Integer = 0 To fn.Length - 1
-            IO.File.Delete(IO.Path.Combine(_grabPicPath, fn(c)))
-         Next
-
-         fn = IO.Directory.GetFiles(_grabPicPath, "~GRAB_*.png")
-         For c As Integer = 0 To fn.Length - 1
-            IO.File.Delete(IO.Path.Combine(_grabPicPath, fn(c)))
-
-            'If Math.Abs(DateDiff(DateInterval.Day, IO.File.GetCreationTime(IO.Path.Combine(PicPath, fn(c))), Date.Now)) > 1 Then
-            '   IO.File.Delete(IO.Path.Combine(PicPath, fn(c)))
-            'End If
-         Next
-
-         IO.File.Create(IO.Path.Combine(_grabPicPath, delFn))
-
-      End If
-
-      _grabTimerMode = 1
-      _grabTimer.Interval = initalDelay
-      _grabTimer.Start()
-
-   End Sub
-
-   Private Sub _grabTimer_Tick(ByVal sender As Object, ByVal e As EventArgs) Handles _grabTimer.Tick
-
-      _grabTimer.Stop()
-
-      Select Case _grabTimerMode
-         Case 1
-            Do
-               If Not IO.File.Exists(IO.Path.Combine(_grabPicPath, String.Format("~GRAB_{0:00000}.png", _grabImgNum))) Then Exit Do
-               _grabImgNum += 1
-            Loop
-
-            If _grabLayer = -1 Then
-               _grabRi = Execute(String.Format("ADD {0} IMAGE ~GRAB_{1:00000}", _grabChannel, _grabImgNum))
-            Else
-               _grabRi = Execute(String.Format("ADD {0}-{1} IMAGE ~GRAB_{2:00000}", _grabChannel, _grabLayer, _grabImgNum))
-            End If
-
-            _grabTimerMode = 2
-            _grabTimer.Interval = 1000
-            _grabTimer.Start()
-
-         Case 2
-            If _grabRi.Number = 202 Then
-
-               If _grabLayer = -1 Then
-                  Execute(String.Format("REMOVE {0} IMAGE", _grabChannel))
-               Else
-                  Execute(String.Format("REMOVE {0}-{1} IMAGE", _grabChannel, _grabLayer))
-               End If
-
-               _grabTimerMode = 3
-               _grabTimer.Interval = 1000
-               _grabTimer.Start()
-
-            Else
-               RaiseEvent GrabFinish(Me, New GrabFinishEventArgs(Nothing, _grabUniqueId))
-            End If
-
-         Case 3
-            Dim fn As String = IO.Path.Combine(_grabPicPath, String.Format("~GRAB_{0:00000}.png", _grabImgNum))
-            If IO.File.Exists(fn) Then
-               _grabTimerMode = 4
-               _grabTimer.Interval = 1500
-               _grabTimer.Start()
-            Else
-               _grabTimerMode = 3
-               _grabTimer.Interval = 500
-               _grabTimer.Start()
-            End If
-
-         Case 4
-            Dim fn As String = String.Format("~GRAB_{0:00000}.png", _grabImgNum)
-
-            Try
-               If _returnBitmap Then
-                  Dim bm As Drawing.Bitmap = New Drawing.Bitmap(IO.Path.Combine(_grabPicPath, fn))
-                  RaiseEvent GrabFinish(Me, New GrabFinishEventArgs(bm, _grabUniqueId, fn))
-               Else
-                  RaiseEvent GrabFinish(Me, New GrabFinishEventArgs(Nothing, _grabUniqueId, fn))
-               End If
-            Catch ex As Exception
-               'Ignore
-            End Try
-
-            _grabTimerMode = 1
-
-         Case Else
-            _grabTimerMode = 1
-
-      End Select
-
-   End Sub
-
-
-
-   ''' <summary>
-   ''' Grab the output to a bitmap
-   ''' </summary>
-   ''' <param name="channel">The channel in Caspar</param>
-   ''' <returns>A Drawing.Bitmap object</returns>
-   ''' <remarks>Defaults to channel 1</remarks>
-   Public Function Grab(ByVal channel As Integer) As Drawing.Bitmap
-      Return Grab(channel, -1)
-   End Function
-
-
-   ''' <summary>
-   ''' Grab the output to a bitmap
-   ''' </summary>
-   ''' <param name="channel">The channel in Caspar</param>
-   ''' <param name="layer">The layer number</param>
-   ''' <returns>A Drawing.Bitmap object</returns>
-   Public Function Grab(ByVal channel As Integer, ByVal layer As Integer) As Drawing.Bitmap
-
-      If Me.ServerAdress.ToLower <> "localhost" Then
-         Throw New Exception("The Grab-Function only works for local CasparCG-Server (localhost)")
-         Return Nothing
-         Exit Function
-      End If
-
-      If VersionSerialized >= 2000004 Then   'Server 2.0.4 Stable: Breaking change of PRINT command, use ADD IMAGE instead.
-
-         Dim PicPath As String = ServerPaths.MediaPath
-
-         If PicPath.EndsWith("\") Then
-            PicPath = PicPath.Substring(0, PicPath.Length - 1)
-         End If
-
-         If Not PicPath.Substring(1, 1) = ":" Then
-            Throw New Exception("The Grab-Function needs to have absolute paths configured in CasparCG.config.")
-            Return Nothing
-            Exit Function
-         End If
-
-         'Delete old files once a day
-         Dim delFn As String = String.Format("~{0:yyyyMMdd}.del", Date.Now)
-         If Not IO.File.Exists(IO.Path.Combine(PicPath, delFn)) Then
-
-            Dim fn() As String = IO.Directory.GetFiles(PicPath, "~*.del")
-            For c As Integer = 0 To fn.Length - 1
-               IO.File.Delete(IO.Path.Combine(PicPath, fn(c)))
-            Next
-
-            fn = IO.Directory.GetFiles(PicPath, "~GRAB_*.png")
-            For c As Integer = 0 To fn.Length - 1
-               IO.File.Delete(IO.Path.Combine(PicPath, fn(c)))
-
-               'If Math.Abs(DateDiff(DateInterval.Day, IO.File.GetCreationTime(IO.Path.Combine(PicPath, fn(c))), Date.Now)) > 1 Then
-               '   IO.File.Delete(IO.Path.Combine(PicPath, fn(c)))
-               'End If
-            Next
-
-            IO.File.Create(IO.Path.Combine(PicPath, delFn))
-
-         End If
-
-         Threading.Thread.Sleep(2000)
-
-         Dim imgNum As Integer = 1
-         Do
-            If Not IO.File.Exists(IO.Path.Combine(PicPath, String.Format("~GRAB_{0:00000}.png", imgNum))) Then Exit Do
-            imgNum += 1
-         Loop
-
-         Dim ri As ReturnInfo
-         If layer = -1 Then
-            ri = Execute(String.Format("ADD {0} IMAGE ~GRAB_{1:00000}", channel, imgNum))
-         Else
-            ri = Execute(String.Format("ADD {0}-{1} IMAGE ~GRAB_{2:00000}", channel, layer, imgNum))
-         End If
-
-         Threading.Thread.Sleep(1000)
-
-         If ri.Number = 202 Then
-
-            If layer = -1 Then
-               Execute(String.Format("REMOVE {0} IMAGE", channel))
-            Else
-               Execute(String.Format("REMOVE {0}-{1} IMAGE", channel, layer))
-            End If
-
-            Dim fn As String = IO.Path.Combine(PicPath, String.Format("~GRAB_{0:00000}.png", imgNum))
-            Do
-               Threading.Thread.Sleep(1000)
-               If IO.File.Exists(fn) Then
-                  Exit Do
-               End If
-            Loop
-
-            Dim bm As Drawing.Bitmap = New Drawing.Bitmap(fn)
-
-            Return bm
-
-         Else
-            Return Nothing
-         End If
-
-
-      Else
-
-         Dim PicPath As String = ServerPaths.DataPath
-
-         If PicPath.EndsWith("\") Then
-            PicPath = PicPath.Substring(0, PicPath.Length - 1)
-         End If
-
-         If Not PicPath.Substring(2, 1) = ":" Then
-            Throw New Exception("The Grab-Function needs to have absolute paths configured in CasparCG.config.")
-            Return Nothing
-            Exit Function
-         End If
-
-         Dim fn() As String
-         fn = IO.Directory.GetFiles(PicPath, "*.png")
-         For c As Integer = 0 To fn.Length - 1
-            IO.File.Delete(fn(c))
-         Next
-
-         Threading.Thread.Sleep(1000)
-
-         Dim ri As ReturnInfo
-         If layer = -1 Then
-            ri = Execute(String.Format("PRINT {0}", channel))
-         Else
-            ri = Execute(String.Format("PRINT {0}-{1}", channel, layer))
-         End If
-
-         If ri.Number = 202 Then
-
-            Do
-               Threading.Thread.Sleep(1000)
-               fn = IO.Directory.GetFiles(PicPath, "*.png")
-               If fn.Length > 0 Then
-                  Exit Do
-               End If
-            Loop
-
-            Dim bm As Drawing.Bitmap = New Drawing.Bitmap(fn(0))
-
-            Return bm
-
-         Else
-            Return Nothing
-         End If
-      End If
-
-   End Function
-
-   ''' <summary>
-   ''' Simple Grab function also for remote servers
-   ''' </summary>
-   ''' <param name="Filename">The filename to store the grabbed image</param>
-   ''' <param name="channel">The channel in Caspar</param>
-   ''' <param name="layer">The layer number</param>
-   Public Sub SimpleGrab(ByVal Filename As String, ByVal channel As Integer, ByVal layer As Integer)
-
-      Execute(String.Format("ADD {0}-{1} IMAGE {2}", channel, layer, Filename))
-
-      Thread.Sleep(1000)
-
-      Execute(String.Format("REMOVE {0}-{1} IMAGE", channel, layer))
-
-   End Sub
-
-#End Region
-
    ''' <summary>
    ''' LayerStatus object
    ''' </summary>
@@ -3520,6 +3164,349 @@ Public Class CasparCG
       Return ls
 
    End Function
+
+#End Region
+
+#Region "Other Methods, functions and shared"
+
+   Private Function AssembleReturnInfo(ByVal s As String) As ReturnInfo
+
+      Dim ri As ReturnInfo = New ReturnInfo()
+
+      If IsNumeric(Left(s, 3)) Then
+         ri.Number = Integer.Parse(Left(s, 3))
+         Dim c As Integer = s.IndexOf(Microsoft.VisualBasic.vbCrLf)
+         If c > 2 Then
+            ri.Message = s.Substring(4, c - 2).Trim
+            Dim d As Integer = s.IndexOf(Microsoft.VisualBasic.vbCrLf, c + 1)
+            If d > 0 Then
+               ri.Data = s.Substring(c + 2).Trim
+               'ri.Data = s.Substring(c + 2, d - c - 2).Trim
+            End If
+         Else
+            ri.Message = "No usefull information returned"
+         End If
+         Return ri
+      Else
+         ri.Number = 0
+         ri.Message = "Data returned"
+         ri.Data = s
+      End If
+
+      Return ri
+   End Function
+
+   ''' <summary>
+   ''' Sends a command to Caspar for execution
+   ''' </summary>
+   ''' <param name="Command">The command-string</param>
+   ''' <returns>A ReturnInfo object</returns>
+   Public Function Execute(ByVal Command As String) As ReturnInfo
+      Return Execute(Command, New Retard, False)
+   End Function
+
+   ''' <summary>
+   ''' Sends a command to Caspar for execution
+   ''' </summary>
+   ''' <param name="Command">The command-string</param>
+   ''' <param name="useDelay">Use a delay while waiting for a server response (list commands)</param>
+   ''' <returns>A ReturnInfo object</returns>
+   Public Function Execute(ByVal Command As String, ByVal useDelay As Boolean) As ReturnInfo
+      Return Execute(Command, New Retard, useDelay)
+   End Function
+
+   ''' <summary>
+   ''' Sends a command to Caspar for execution
+   ''' </summary>
+   ''' <param name="Command">The command-string</param>
+   ''' <param name="Retard">Delay the execution for this amount of milliseconds</param>
+   ''' <returns>A ReturnInfo object</returns>
+   Public Function Execute(ByVal Command As String, ByVal Retard As Retard) As ReturnInfo
+      Return Execute(Command, Retard, False)
+   End Function
+
+   ''' <summary>
+   ''' Sends a command to Caspar for execution
+   ''' </summary>
+   ''' <param name="Command">The command-string</param>
+   ''' <param name="Retard">Delay the execution for this amount of milliseconds</param>
+   ''' <param name="useDelay">Use a delay while waiting for a server response (list commands)</param>
+   ''' <returns>A ReturnInfo object</returns>
+   ''' <remarks>Can be used for any command. See CasparCG's wiki for valid commands</remarks>
+   Public Function Execute(ByVal Command As String, ByVal Retard As Retard, ByVal useDelay As Boolean) As ReturnInfo
+
+      If _Caspar.Connected Then
+
+         'Debug.Print(Command)
+
+         If Retard.Amount > 0 Then
+            _DelayQueue.Add(Retard.Amount, Command)
+         Else
+
+            Dim cmd As Byte() = Encoding.UTF8.GetBytes(Command + Microsoft.VisualBasic.vbCrLf)
+            Dim bytes(128) As Byte
+            Dim s As String = ""
+            Try
+               ' Blocks until send returns.
+               Dim i As Integer = _Caspar.Send(cmd)
+
+               If useDelay Then
+                  Thread.Sleep(250)
+               End If
+
+               ' Get reply from the server.
+               Do
+                  i = _Caspar.Receive(bytes, bytes.Length, SocketFlags.None)
+                  s += Encoding.UTF8.GetString(bytes)
+                  If i < bytes.Length Then Exit Do
+                  'If s.Length > 64000 Then Exit Do 'ToDo: Fix this
+               Loop
+
+            Catch ex As SocketException
+               If s.Length > 0 Then
+                  Return AssembleReturnInfo(s)
+               Else
+                  Return New ReturnInfo(0, String.Format("{0} Error code: {1}.", ex.Message, ex.ErrorCode), "")
+               End If
+            End Try
+
+            Return AssembleReturnInfo(s)
+
+         End If
+
+      Else
+
+         _Caspar = New Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp)
+         Connect()
+         If _Caspar.Connected Then
+            Return Execute(Command)
+         Else
+            Return New ReturnInfo(0, "Not connected to CasparCG", "")
+         End If
+
+      End If
+
+      Return New ReturnInfo(0, "Still not connected to CasparCG", "")
+
+   End Function
+
+   ''' <summary>
+   ''' Connects to CasparCG
+   ''' </summary>
+   ''' <param name="serverAdress">IP-Address or computer name to connect to Caspar</param>
+   ''' <remarks>Sets the ServerAdress property</remarks>
+   ''' <returns>A enumConnectResult denoting the result</returns>
+   Public Function Connect(ByVal serverAdress As String) As enumConnectResult
+      _ServerAdress = serverAdress
+      Return Me.Connect()
+   End Function
+
+   ''' <summary>
+   ''' Connects to CasparCG
+   ''' </summary>
+   ''' <param name="serverAdress">IP-Address or computer name to connect to Caspar</param>
+   ''' <param name="Port">The port number to connect to</param>
+   ''' <remarks>Sets the ServerAdress and Port properties</remarks>
+   ''' <returns>A enumConnectResult denoting the result</returns>
+   Public Function Connect(ByVal serverAdress As String, ByVal Port As Integer) As enumConnectResult
+      _ServerAdress = serverAdress
+      _Port = Port
+      Return Me.Connect()
+   End Function
+
+   ''' <summary>
+   ''' Connects to CasparCG
+   ''' </summary>
+   ''' <param name="ServerAdress">IP-Address or computer name to connect to Caspar</param>
+   ''' <param name="KeepQuiet">Inhibits exeptions on connection errors</param>
+   ''' <remarks>Sets the ServerAdress and KeepQuiet properties</remarks>
+   ''' <returns>A enumConnectResult denoting the result</returns>
+   Public Function Connect(ByVal ServerAdress As String, ByVal KeepQuiet As Boolean) As enumConnectResult
+      _ServerAdress = ServerAdress
+      _KeepQuiet = KeepQuiet
+      Return Me.Connect()
+   End Function
+
+   ''' <summary>
+   ''' Connects to CasparCG
+   ''' </summary>
+   ''' <param name="Retries">Number of retries for a connection, before giving up.</param>
+   ''' <param name="CasparExePath">Full qualified path to Caspar's exe file. Must be local to the client.</param>
+   ''' <remarks>Sets the Retries and CasparExePath properties</remarks>
+   ''' <returns>A enumConnectResult denoting the result</returns>
+   Public Function Connect(ByVal Retries As Integer, ByVal CasparExePath As String) As enumConnectResult
+      If Me.ServerAdress.ToLower = "localhost" Or Me.ServerAdress = "127.0.0.1" Then
+         _CasparExePath = CasparExePath
+         _Retries = Retries
+         Return Me.Connect()
+      Else
+         Return enumConnectResult.crIsNotLocal
+      End If
+   End Function
+
+   ''' <summary>
+   ''' Connects to CasparCG
+   ''' </summary>
+   ''' <remarks>The main Connect function. Uses properties</remarks>
+   ''' <returns>A enumConnectResult denoting the result</returns>
+   Public Function Connect() As enumConnectResult
+
+      Dim retVal As enumConnectResult = enumConnectResult.crSuccessfull
+
+      Dim ping As Ping = New Ping
+
+      Dim pr As PingReply = Nothing
+      Try
+         pr = ping.Send(_ServerAdress, 1500)
+      Catch ex As Exception
+         'handled futher down
+      End Try
+
+      If pr.Status = IPStatus.Success Then
+
+         Try
+            _Caspar.Connect(_ServerAdress, _Port)
+
+         Catch ex As Exception
+
+            If _Retries > 5 And IO.File.Exists(_CasparExePath) Then
+
+               _CasparProc = New Process
+               _CasparProc.StartInfo.FileName = _CasparExePath
+               _CasparProc.StartInfo.WorkingDirectory = IO.Path.GetDirectoryName(_CasparExePath)
+               _CasparProc.StartInfo.CreateNoWindow = False
+               _CasparProc.StartInfo.WindowStyle = ProcessWindowStyle.Minimized
+               _CasparProc.Start()
+
+               Dim t As Integer = 0
+               Do
+                  If Not _Caspar.Connected Then
+
+                     Try
+                        _Caspar.Connect(_ServerAdress, _Port)
+                     Catch exp As Exception
+                        Debug.Print(exp.Message)
+                     End Try
+
+                  End If
+
+                  If _Caspar.Connected Then
+
+                     'Check for Scanner.exe
+                     Dim scannerFilename As String = IO.Path.Combine(IO.Path.GetDirectoryName(_CasparExePath), "Scanner.exe")
+                     If IO.File.Exists(scannerFilename) Then
+
+                        _Scanner = New Process
+                        _Scanner.StartInfo.FileName = IO.Path.Combine(IO.Path.GetDirectoryName(_CasparExePath), "Scanner.exe")
+                        _Scanner.StartInfo.WorkingDirectory = IO.Path.GetDirectoryName(_CasparExePath)
+                        _Scanner.StartInfo.CreateNoWindow = False
+                        _Scanner.StartInfo.WindowStyle = ProcessWindowStyle.Minimized
+                        _Scanner.Start()
+
+                     End If
+
+                     Exit Do
+
+                  Else
+
+                     If t > _Retries Then
+                        retVal = enumConnectResult.crLocalCasparCGCouldNotBeStarted
+                        Exit Do
+                     Else
+                        System.Threading.Thread.Sleep(1000)
+                        t += 1
+                     End If
+
+                  End If
+
+               Loop
+
+            Else
+               retVal = enumConnectResult.crCasparCGNotStarted
+            End If
+
+         End Try
+
+      Else
+         retVal = enumConnectResult.crMachineNotAvailable
+      End If
+
+      Return retVal
+
+   End Function
+
+   ''' <summary>
+   ''' Disconnects from Caspar
+   ''' </summary>
+   ''' <remarks>The object can reconnect on version 2.0.7</remarks>
+   Public Sub Disconnect()
+      If _Caspar.Connected Then
+         Try
+            _Caspar.Disconnect(False)
+            _Caspar = New Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp)
+         Catch ex As Exception
+            'ignore
+         End Try
+      End If
+   End Sub
+
+   Public Sub Shutdown()
+
+      If _Scanner IsNot Nothing Then
+         Try
+            _Scanner.Kill()
+         Catch ex As Exception
+         Finally
+            _Scanner.Dispose()
+         End Try
+      End If
+
+      If _CasparProc IsNot Nothing Then
+         Try
+            _CasparProc.Kill()
+         Catch ex As Exception
+         Finally
+            _CasparProc.Dispose()
+         End Try
+      Else
+         If Version.Major = 2 And Version.Minor = 0 Then
+            Execute("KILL")
+         End If
+      End If
+
+   End Sub
+
+   Public Sub Restart()
+      If IO.File.Exists(CasparExePath) Then
+
+         If _Scanner IsNot Nothing Then
+            Try
+               _Scanner.Kill()
+            Catch ex As Exception
+            Finally
+               _Scanner.Dispose()
+            End Try
+         End If
+
+         If _CasparProc IsNot Nothing Then
+            Try
+               _CasparProc.Kill()
+            Catch ex As Exception
+            Finally
+               _CasparProc.Dispose()
+            End Try
+         Else
+            If Version.Major = 2 And Version.Minor = 0 Then
+               Execute("KILL")
+            End If
+         End If
+
+         _Caspar = New Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp)
+         Threading.Thread.Sleep(2000)
+         Connect()
+
+      End If
+   End Sub
 
    Public Sub SynchPictureFolder(ByVal ClientsPictureFolder As String)
       CopyAll(New DirectoryInfo(ClientsPictureFolder), New DirectoryInfo(Me.RemotePictureFolder))
@@ -3714,8 +3701,6 @@ Public Class CasparCG
       End If
 
    End Sub
-
-#End Region
 
 #End Region
 
