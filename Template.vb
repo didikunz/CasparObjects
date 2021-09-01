@@ -16,6 +16,7 @@ Public Class Template
 #Region "Properties"
 
    Private _Fields As List(Of TemplateField) = New List(Of TemplateField)
+   Private _Parameters As List(Of Parameter) = New List(Of Parameter)
 
    ''' <summary>
    ''' Name of the template
@@ -78,6 +79,22 @@ Public Class Template
          Return _Fields
       End Get
    End Property
+
+#End Region
+
+#Region "Helpers"
+
+   Private Sub AddParameter(name As String, info As String)
+      _Parameters.Add(New Parameter(name, Parameter.enumFieldType.ftString, info))
+   End Sub
+
+   Private Sub AddParameter(name As String, type As Parameter.enumFieldType)
+      _Parameters.Add(New Parameter(name, type))
+   End Sub
+
+   Private Sub AddParameter(name As String, type As Parameter.enumFieldType, info As String)
+      _Parameters.Add(New Parameter(name, type, info))
+   End Sub
 
 #End Region
 
@@ -166,6 +183,20 @@ Public Class Template
 
    End Function
 
+   Public Function ParameterList() As String
+
+      Dim sb As StringBuilder = New StringBuilder
+
+      sb.AppendLine("   <parameters>")
+      For Each par As Parameter In _Parameters
+         sb.AppendLine(String.Format("    <parameter id=""{0}"" type=""{1}"" info=""{2}"" />", par.Name, par.GetFieldType(), par.Info))
+      Next
+      sb.AppendLine("   </parameters>")
+
+      Return sb.ToString
+
+   End Function
+
    ''' <summary>
    ''' Add TemplateField to this Template
    ''' </summary>
@@ -175,6 +206,7 @@ Public Class Template
    Public Sub AddField(Name As String, Value As String)
       If Value IsNot Nothing Then
          Fields.Add(New TemplateField(Name, Value))
+         AddParameter(Name, Value)
       End If
    End Sub
 
@@ -188,6 +220,7 @@ Public Class Template
    Public Sub AddField(Name As String, Value As String, Encoding As Boolean)
       If Value IsNot Nothing Then
          Fields.Add(New TemplateField(Name, Value, Encoding))
+         AddParameter(Name, Value)
       End If
    End Sub
 
@@ -201,6 +234,7 @@ Public Class Template
    ''' <remarks>Checks for null (Nothing) values</remarks>
    Public Sub AddField(Name As String, Value As String, Encoding As Boolean, RenderAsElement As Boolean)
       Fields.Add(New TemplateField(Name, Value, Encoding, RenderAsElement))
+      AddParameter(Name, Value)
    End Sub
 
    ''' <summary>
@@ -215,6 +249,7 @@ Public Class Template
    Public Sub AddField(Name As String, Value As String, Encoding As Boolean, RenderAsElement As Boolean, AttributeType As TemplateField.enumAttributeType)
       If Value IsNot Nothing Then
          Fields.Add(New TemplateField(Name, Value, Encoding, RenderAsElement, AttributeType))
+         AddParameter(Name, Value)
       End If
    End Sub
 
@@ -225,6 +260,7 @@ Public Class Template
    ''' <param name="Value">Value of the field</param>
    Public Sub AddField(Name As String, Value As Integer)
       Fields.Add(New TemplateField(Name, Value.ToString))
+      AddParameter(Name, Parameter.enumFieldType.ftInteger, Value.ToString)
    End Sub
 
    ''' <summary>
@@ -234,6 +270,7 @@ Public Class Template
    ''' <param name="Value">Value of the field</param>
    Public Sub AddField(Name As String, Value As Boolean)
       Fields.Add(New TemplateField(Name, Value.ToString))
+      AddParameter(Name, Value.ToString)
    End Sub
 
    ''' <summary>
@@ -279,6 +316,7 @@ Public Class Template
             End Try
          End If
       End If
+      If Not SendAsBase64 Then AddParameter(Name, Parameter.enumFieldType.ftImage)
    End Sub
 
    ''' <summary>
@@ -301,6 +339,7 @@ Public Class Template
       Catch ex As Exception
          'ignore
       End Try
+      AddParameter(Name, Parameter.enumFieldType.ftImage)
 
    End Sub
 
@@ -309,9 +348,36 @@ Public Class Template
    ''' </summary>
    ''' <param name="Name">Name of the field</param>
    ''' <param name="Color">System.Drawing.Color</param>
-   ''' <remarks>Formats the color value as hex-string</remarks>
+   ''' <remarks>Formats the color value as hex-string with leading 0x</remarks>
    Public Sub AddColorField(Name As String, Color As Color)
-      Fields.Add(New TemplateField(Name, String.Format("0x{0:X8}", Color.ToArgb)))
+      AddColorField(Name, Color.ToArgb, False)
+   End Sub
+
+   ''' <summary>
+   ''' Add color field to this Template
+   ''' </summary>
+   ''' <param name="Name">Name of the field</param>
+   ''' <param name="Color">System.Drawing.Color</param>
+   ''' <param name="ForHTML">If true adds # before the color string, 0x otherwise</param>
+   ''' <remarks>Formats the color value as hex-string</remarks>
+   Public Sub AddColorField(Name As String, Color As Color, ForHTML As Boolean)
+      AddColorField(Name, Color.ToArgb, ForHTML)
+   End Sub
+
+   ''' <summary>
+   ''' Add color field to this Template
+   ''' </summary>
+   ''' <param name="Name">Name of the field</param>
+   ''' <param name="Color">integer with RGB color</param>
+   ''' <param name="ForHTML">If true adds # before the color string, 0x otherwise</param>
+   ''' <remarks>Formats the color value as hex-string</remarks>
+   Public Sub AddColorField(Name As String, Color As Integer, ForHTML As Boolean)
+      If ForHTML Then
+         Fields.Add(New TemplateField(Name, String.Format("#{0:X8}", Color)))
+      Else
+         Fields.Add(New TemplateField(Name, String.Format("0x{0:X8}", Color)))
+      End If
+      AddParameter(Name, Parameter.enumFieldType.ftColor)
    End Sub
 
    ''' <summary>

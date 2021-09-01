@@ -252,6 +252,12 @@ Public Class CasparCG
    Public Property RemotePictureFolder As String
 
    ''' <summary>
+   ''' Set Channel-filter for the ExecuteFiltered function
+   ''' </summary>
+   ''' <remarks>A space separated list of allowed channels</remarks>
+   Public Property ChannelFilterList As String
+
+   ''' <summary>
    ''' Indicate connection status
    ''' </summary>
    ''' <remarks>True if connected, false otherwise</remarks>
@@ -428,6 +434,12 @@ Public Class CasparCG
    ''' </summary>
    <XmlIgnore()>
    Public Property LastClearlayer As Integer
+
+   ''' <summary>
+   ''' Sets the path to write metadata files into.
+   ''' </summary>
+   <XmlIgnore()>
+   Public Property MetaDataPath As String
 
 #End Region
 
@@ -3167,6 +3179,32 @@ Public Class CasparCG
 
 #End Region
 
+#Region "Metadata"
+
+   Public Sub WriteMetaData(Name As String, Template As Template)
+
+      If Directory.Exists(MetaDataPath) AndAlso Template IsNot Nothing AndAlso Name <> "" Then
+
+         Using writer As StreamWriter = New StreamWriter(Path.Combine(MetaDataPath, Name.Replace(" ", "_") + ".xml"))
+
+            writer.WriteLine("<template version=""2.0.0"" authorName=""{0}"" authorEmail=""{1}"" templateInfo="""" originalWidth=""{2}"" originalHeight=""{3}"" originalFrameRate=""{4}"">", Template.Author, Template.AuthorEMail, Template.Width, Template.Height, Template.FrameRate)
+            writer.WriteLine("   <components />")
+            writer.WriteLine("   <keyframes />")
+            writer.WriteLine("   <instances />")
+            writer.Write(Template.ParameterList)
+            writer.WriteLine("</template>")
+
+            writer.Flush()
+            writer.Close()
+
+         End Using
+
+      End If
+
+   End Sub
+
+#End Region
+
 #Region "Other Methods, functions and shared"
 
    Private Function AssembleReturnInfo(ByVal s As String) As ReturnInfo
@@ -3223,6 +3261,49 @@ Public Class CasparCG
    ''' <returns>A ReturnInfo object</returns>
    Public Function Execute(ByVal Command As String, ByVal Retard As Retard) As ReturnInfo
       Return Execute(Command, Retard, False)
+   End Function
+
+   ''' <summary>
+   ''' Sends a command to Caspar for execution
+   ''' </summary>
+   ''' <param name="Command">The command-string</param>
+   ''' <param name="ChannelFilterList">A space separated list of allowed channels</param>
+   ''' <returns>A ReturnInfo object</returns>
+   Public Function Execute(ByVal Command As String, ByVal ChannelFilterList As String) As ReturnInfo
+
+      Try
+
+         Dim i As Integer = Command.IndexOf(" ", 0)
+         Dim j As Integer = Command.IndexOf(" ", i + 1)
+
+         Dim cmd As String = ""
+         If j < 0 Then
+            cmd = Command.Substring(i + 1)
+         Else
+            cmd = Command.Substring(i + 1, j - i)
+         End If
+
+         Dim parts() As String = cmd.Split("-".ToCharArray)
+         If parts.Count = 0 Then
+            Return Execute(Command, New Retard, False)
+         Else
+
+            Dim channel As String = parts(0).Trim
+            If IsNumeric(channel) Then
+               If ChannelFilterList.Contains(channel) Then
+                  Return Execute(Command, New Retard, False)
+               Else
+                  Return New ReturnInfo()
+               End If
+            Else
+               Return New ReturnInfo()
+            End If
+         End If
+
+      Catch ex As Exception
+         Return New ReturnInfo()
+      End Try
+
    End Function
 
    ''' <summary>
@@ -3288,6 +3369,19 @@ Public Class CasparCG
 
       Return New ReturnInfo(0, "Still not connected to CasparCG", "")
 
+   End Function
+
+   ''' <summary>
+   ''' Excecute a command if the channel is contained in the ChannelFilterList property
+   ''' </summary>
+   ''' <param name="Command"></param>
+   ''' <returns>A ReturnInfo object</returns>
+   Public Function ExecuteFiltered(ByVal Command As String) As ReturnInfo
+      If ChannelFilterList <> "" Then
+         Return Execute(Command, ChannelFilterList)
+      Else
+         Return Execute(Command)
+      End If
    End Function
 
    ''' <summary>
@@ -3450,7 +3544,18 @@ Public Class CasparCG
       End If
    End Sub
 
+   ''' <summary>
+   ''' Shutdown CasparCG Server
+   ''' </summary>
    Public Sub Shutdown()
+      Shutdown(True)
+   End Sub
+
+   ''' <summary>
+   ''' Shutdown CasparCG Server
+   ''' </summary>
+   ''' <param name="useKillCommand">When Caspar is not started by the library, use the KILL command to terminate version 2.0.x servers</param>
+   Public Sub Shutdown(useKillCommand As Boolean)
 
       If _Scanner IsNot Nothing Then
          Try
@@ -3462,21 +3567,34 @@ Public Class CasparCG
       End If
 
       If _CasparProc IsNot Nothing Then
+
          Try
             _CasparProc.Kill()
          Catch ex As Exception
          Finally
             _CasparProc.Dispose()
          End Try
-      Else
+
+      ElseIf useKillCommand Then
+
          If Version.Major = 2 And Version.Minor = 0 Then
             Execute("KILL")
          End If
+
       End If
 
    End Sub
 
    Public Sub Restart()
+      Restart("")
+   End Sub
+
+   Public Sub Restart(NewCasparExePath As String)
+
+      If NewCasparExePath <> "" AndAlso IO.File.Exists(NewCasparExePath) Then
+         CasparExePath = NewCasparExePath
+      End If
+
       If IO.File.Exists(CasparExePath) Then
 
          If _Scanner IsNot Nothing Then
